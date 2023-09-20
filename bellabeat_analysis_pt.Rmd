@@ -1,0 +1,288 @@
+---
+title: "Análise de dados Bellabeat"
+author: "Raquel R Sátiro"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introdução
+
+O presente estudo de caso foi proposto pelo programa *Google Data Analytics (PT)*, para aplicação das ferramentas e técnicas de análise de dados expostas ao longo dos 8 cursos.
+
+# Cenário
+
+A empresa Bellabeat fabrica produtos de alta tecnologia, tendo como público-alvo as mulheres, e busca maior participaçao no mercado de dispositivos inteligentes.  
+A CEO e cofundadora da empresa, Urška Sršen, acredita que a análise de dados de dispositivos inteligentes de outras empresas fornecerá informações de como tais produtos são utilizados, que posteriormente orientarão as estratégias de venda da equipe de marketing.
+
+# Perguntas
+
+-   Quais são algumas das tendências no uso de dispositivos inteligentes?
+-   Como essas tendências podem se aplicar aos clientes da Bellabeat?
+-   Como essas tendências podem ajudar a influenciar a estratégia de marketing da Bellabeat?
+
+# Partes interessadas
+
+-   Urška Sršen (CEO e cofundadora);
+-   Sando Mur (Matemático e cofundador);
+-   Equipe de marketing.
+
+# Dados analisados
+
+Dados do rastreador de condicionamento físico FitBit disponível no [*Kaggle*](https://www.kaggle.com/datasets/arashnic/fitbit).  
+É um conjunto de dados público composto por 18 arquivos contendo informações sobre o tempo em atividade física, frequência cardíaca, monitoramente do sono, dentre outros. A coleta dos dados ocorreu ao longo de 3 meses, com consentimento prévio dos usuários. 
+
+# Etapas da análise dos dados
+
+### Carregando os pacotes utilizados:
+
+```{r message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+```
+### Importando os dados
+
+```{r}
+
+activities <-read.csv('../fitbase_dataset/dailyActivity_merged.csv')
+View(activities)
+
+calories <- read.csv('../fitbase_dataset/dailyCalories_merged.csv')
+View(calories)
+
+intensities <- read.csv('../fitbase_dataset/dailyIntensities_merged.csv')
+View(intensities)
+
+steps <- read.csv('../fitbase_dataset/dailySteps_merged.csv')
+View(steps)
+
+heart_rate <- read.csv('../fitbase_dataset/heartrate_seconds_merged.csv')
+View(heart_rate)
+
+sleep <- read.csv('../fitbase_dataset/sleepDay_merged.csv')
+View(sleep)
+
+weight <- read.csv('../fitbase_dataset/weightLogInfo_merged.csv')
+View(weight)
+
+```
+### Revisando os dados
+
+Verificou-se a composição de cada tabela quanto aos tipos de dados, quantidade de registros, dados nulos e estatísticas básicas.    
+Estabeleceu-se que o número mínimo de participantes distintos para a  análise ser relevante seriam 20.  
+Excluiu-se as tabelas *weight* e *heart_rate* por conterem, respectivamente, apenas 8 e 14 participantes distintos.  
+As demais contêm 33 participantes, exceto *sleep*, que possui 24.
+
+```{r}
+
+summary(weight)
+is.na.data.frame(weight)
+n_distinct(weight$Id)
+
+summary(heart_rate)
+is.na.data.frame(heart_rate)
+n_distinct(heart_rate$Id)
+
+summary(steps)
+is.na.data.frame(steps)
+n_distinct(steps$Id)#33
+
+summary(intensities)
+is.na.data.frame(intensities)
+n_distinct(intensities$Id)
+
+summary(calories)
+is.na.data.frame(calories)
+n_distinct(calories$Id)
+
+summary(activities)
+is.na.data.frame(activities)
+n_distinct(activities$Id)
+
+summary(sleep)
+is.na.data.frame(sleep)
+n_distinct(sleep$Id)
+
+```
+
+### Agrupando tabelas
+
+Unimos as tabelas *activities* e *sleep* pelo Id dos usuários, criando uma tabela com todos os atributos coletados.  
+Também criou-se uma tabela com as médias de cada atributo dessa tabela.
+
+```{r}
+
+merge<-merge.data.frame(activities,sleep, by='Id')
+View(merge)
+summary(merge)
+
+activities_mean <- activities %>%
+  select(Id,VeryActiveMinutes,FairlyActiveMinutes,LightlyActiveMinutes,SedentaryMinutes,Calories)%>%
+  group_by(Id)%>%
+  drop_na()%>%
+  summarize(mean_VeryActiveMinutes = mean(VeryActiveMinutes),mean_FairlyActiveMinutes = mean(FairlyActiveMinutes),mean_LightlyActiveMinutes = mean(LightlyActiveMinutes),mean_SedentaryMinutes = mean(SedentaryMinutes), mean_Calories=mean(Calories))
+View(activities_mean)
+
+sleep_mean <- sleep%>%
+  select(Id,TotalMinutesAsleep,TotalTimeInBed)%>%
+  group_by(Id)%>%
+  drop_na()%>%
+  summarize(mean_TotalMinutesAsleep = mean(TotalMinutesAsleep), mean_TotalTimeInBed=mean(TotalTimeInBed))
+View(sleep_mean)
+
+merge_means<-merge.data.frame(activities_mean ,sleep_mean, by='Id')
+View(merge_means)
+
+```
+### Visualizações
+
+Comecemos verificando a relação entre os valores médios dos tipos de atividade física realizada e as calorias perdidas registradas por cada usuário.  
+A maioria das entradas indica atividades leves sendo praticads por mais tempo e maior frequência entre os usuários, com perda calórica média de 1500 a 3500.  
+
+```{r}
+
+colors<-c('Intensa'="#CC79A7",'Moderada'="#D55E00", 'Leve'="#0072B2")
+
+ggplot(data=merge_means, aes(y=mean_Calories))+
+  geom_point(mapping = aes(x=mean_VeryActiveMinutes,color='Intensa'),size =2 )+
+  geom_point(mapping = aes(x=mean_FairlyActiveMinutes,color='Moderada'), size =2)+
+  geom_point(mapping = aes(x=mean_LightlyActiveMinutes,color='Leve'), size =2)+
+  labs(title = 'Média de calorias perdidas com relação as atividade realizadas', 
+       x='Atividade realizada (minutos)',
+       y="Média de calorias perdidas")+
+  scale_color_manual(name='Atividade realizada:',values=colors)+
+  theme_light()
+
+```
+
+Durante o período de coleta dos dados, temos que o tempo de sedentarismo entre 450 a 950 minutos foi aquele com o maior número de registros dos usuários, como vemos no histograma.  
+
+```{r}
+
+ggplot(data = merge)+
+  geom_histogram(mapping = aes(SedentaryMinutes), bins=20, binwidth = 100, fill='lightblue')+
+  scale_x_continuous(name='Tempo (minutos)',breaks=seq(0,1500,100)) +
+  scale_y_continuous(name=" ")+
+  theme_light()
+
+```
+
+Existe uma correlação negativa entre o valor do gasto calórico e o tempo sedentário ,mas o gráfico mostra um aumento inicial dos valores, seguido de um platô.  
+Há uma  maior concentração de entradas entre 500 a 1000 minutos de tempo sedentário e perda calórica entre 1500 e 3500.    
+Podemos inferir que talvez os usuários não tenham registrado o tempo em que realizaram alguma atividade física.
+
+```{r}
+
+cor.test(merge$SedentaryMinutes, merge$Calories)
+
+ggplot(data=merge, aes(x=SedentaryMinutes,y=Calories))+
+ geom_point() +
+  geom_smooth()+
+  scale_x_continuous(name='Tempo sedentario (minutos)') +
+  scale_y_continuous(name='Calorias perdidas')+
+  theme_light()+
+  labs(title = 'Tempo sedentario x Gasto calorico')
+
+```
+
+Com relação ao número total de passos e calorias perdidas, a correlação é positiva.  
+
+```{r}
+
+cor.test(merge$TotalSteps, merge$Calories)
+
+ggplot(data=merge)+
+  geom_point(mapping = aes(x=TotalSteps, y=Calories))+
+  labs(title = 'Total de Passos x Calorias')+
+  theme_light()
+
+```
+
+Após análise dos dados do total de passos, do tempo sedentário e das calorias perdidas, descobrimos que o número de passos dos usuários com tempo sedentário maior que 700 minutos foi de até 15.000. Mas, dentre esses, um número menor de usuários registrou queima calórica maior que 2000.
+
+```{r}
+
+facet_labels <-c('Tempo parado menor que 700min', 'Tempo parado maior que 700min')
+names(facet_labels)<-c('FALSE','TRUE')
+
+ggplot(data=merge)+
+  geom_histogram(mapping = aes(TotalSteps, fill=Calories>2000), bins=10)+
+  facet_wrap(~SedentaryMinutes >=700, labeller = as_labeller(facet_labels))+
+  scale_fill_discrete(name='Perda calorica:', labels=c("Menor que 2000",'Maior que 2000'))+
+  scale_x_continuous(name='Passos') +
+  scale_y_continuous(name="")+
+  theme(legend.position = 'bottom')+
+  theme_light()
+
+```
+
+Encontramos uma correlação positiva entre o tempo deitado e o tempo de sono, ou seja, quanto mais tempo deitado mais tempo de sono.
+
+```{r}
+
+cor.test(merge$TotalMinutesAsleep,merge$TotalTimeInBed)
+
+ggplot(data=merge)+
+   geom_jitter(mapping = aes(x=TotalMinutesAsleep, y=TotalTimeInBed))+
+   geom_smooth(mapping = aes(x=TotalMinutesAsleep, y=TotalTimeInBed))+
+   scale_x_continuous(name='Tempo dormindo(minutos)',breaks=seq(0,900,100)) +
+   scale_y_continuous(name="Tempo deitado (minutos)",breaks=seq(0,1500,100))+
+   theme_light()
+
+```
+
+O tempo médio de sono foi entre 300 a 550 minutos, e o tempo médio deitado entre 350 a 650 minutos.  
+Mas, o tempo máximo deitado e dormindo e a média desses valores demonstram que os usuários passavam mais tempo deitados do que dormindo.  
+Pode-se inferir que os usuários realizam alguma atividade antes de dormir ou ao acordar, como ler um livro ou mexer no celular. 
+
+```{r}
+
+max(merge$TotalMinutesAsleep)
+mean(merge$TotalMinutesAsleep)
+
+max(merge$TotalTimeInBed)
+mean(merge$TotalTimeInBed)
+
+```
+
+A correlação entre o tempo de sono e o tempo sedentário é negativa. Porém, o gráfico demonstra um aumento do tempo médio de sono em pessoas com tempo médio sedentário maior do que 1000 minutos.  
+Podemos inferir que distúrbios do sono podem ter implicações na prática de atividade física, devendo ser investigados por um profissional de saúde.
+
+```{r}
+
+cor.test(merge$TotalMinutesAsleep,merge$SedentaryMinutes)
+
+ggplot(data=merge_means)+
+  geom_point(mapping = aes(x=mean_SedentaryMinutes,y=mean_TotalMinutesAsleep,)) +
+  geom_smooth(mapping = aes(x=mean_SedentaryMinutes,y=mean_TotalMinutesAsleep))+
+  theme_light()+
+  labs(title = 'Tempo sedentário x Tempo de sono',
+       x='Sedentarismo (minutos)',y='Sono (minutos)')
+
+```
+
+# Recomendações 
+
+A Bellabeat possui vários produtos para monitoramento do bem-estar de suas usuárias, podendo investir na promoção do aplicativo em conjunto com o uso do **Leaf**, seu versátil rastreador que monitora sono, atividades e estresse.  
+Escolhemos o **Leaf** por sua aparência elegante, feito com materiais naturais e hipoalergênicos. Além disso, pode ser usado como pulseira, clipe ou colar, tornando-o mais confortável para uso como monitor de sono. Embora sincronize facilmente com  celulares, o backup dos dados coletados é feito de maneira independente.  
+As campanhas de marketing podem ter como público-alvo mulheres que trabalham fora e passam muitas horas sentadas.  
+A análise revelou que um maior número de usuários realiza atividades físicas leves por mais tempo (entre 50 e 300 minutos). Segundo o [*Physical Activity Guidelines for Americans*](https://health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf), a quantidade total de exercícios aeróbicos, como caminhadas, natação ou bicicleta, contribui mais para um estilo de vida  saudável do que sua intensidade, duração ou frequência.  
+Ao realizar seu primeiro cadastro, a usuária poderá personalizar suas metas de atividade física.Levando em consideração sua idade, condições físicas e tempo disponível, um formulário intuitivo poderá auxiliá-la a criar o melhor plano d exercícios para sua rotina. Recomendações com relação a melhor modalidade de atividade e sua intensidade, tempo e frequência ideais poderão ser exibidas para auxiliá-la em suas escolhas.  
+O aplicativo poderá notificar a usuária para mantê-la engajada em seu treinamento com lembretes para se exercitar, dicas para melhor aproveitamento do exercício e possíveis progressões.
+Segundo o site [*Healthline*](https://www.healthline.com/health/how-many-steps-a-day#why-10-000-steps), vários estudos determinaram que o valor mínimo de passos diários ideal é de 10.000. Este valor pode variar com a idade e metas dos indivíduos, mas seus benefícios para a saúde são muitos, como melhora nos níveis de colesterol, condicionamento físico e flexibilidade.  
+O produto poderá emitir uma vibração e/ou notificação para alertar a usuária que está parada há algum tempo, fazendo com que ela se movimente ao longo do dia e reduza o tempo de sedentarismo. O aplicativo pode associar ao alerta uma sugestão de atividade curtas que seja adequada ao ambiente de trabalho, como alongamentos, caminhar pelo corredor, usar escadas, ir até o colega ao invés de ligar ou enviar um e-mail e estacionar longe do escritório.   
+A análise mostrou que muitas calorias são perdidas por pessoas com altos tempos sedentários, levando a suposição de que as usuárias não estariam registrando as atividades físicas.  
+O **Leaf**, ao perceber um aumento repentino na frequência cardíaca e/ou do número de passos, poderá notificar a usuária para que identifique essas alterações como uma atividade física.
+O aplicativo pode recomendar ações para melhorar a qualidade e quantidade do sono, como reduzir a exposição a luz azul, criar um ambiente adequado para dormir e melhorar os hábitos de higiene. Também, pode educar a usuária sobre alterações do sono comuns para que ela saiba como identificar irregularidades e busque auxilio de um professional da saúde.  
+Por fim, como a Bellabeat possui planos pagos, recomenda-se estabelecer um período de teste para as usuárias conheçam seus serviços e vantagens. Criar um plano gratuito com os serviçoes relacionados as funcionalidades do rastreador, enquanto envia notificações sobre os serviços personalizados pagos poderá ser uma abordagem válida para convecer as usuárias a assinar os planos.   
+
+# Agradecimentos
+
+Muito obrigada a todos que se interessaram por este projeto. É minha primeira análise de dados e também a primeira com R.
+Agradeço quaisquer feedbacks.  

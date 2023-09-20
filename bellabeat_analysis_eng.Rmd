@@ -1,0 +1,291 @@
+---
+title: "Bellabeat's Data Analysis"
+author: "Raquel R Sátiro"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introduction
+
+This case study is part of the *Google Data Analytics (PT)* program, where the students can apply the analysis techniques and tools learned throughout the 8 courses.
+
+# Scenario
+
+Bellabeat is a high technology products manufacture, having women as their target audience, is seeking a bigger participation in the smart devices market.  
+Urška Sršen, CEO and co-founder, believes that data analysis of other companies devices can provide useful information which can be used by Bellabeat's marketing team to create new sale strategies.
+
+# Questions
+
+-   What are some trends that can be identified in the smart device usage?
+-   How these trends can be applied to Bellabeat's customers?
+-   How these trends can help Bellabeat's marketing strategies?
+
+# Stakeholders
+
+-   Urška Sršen (CEO and co-founder);
+-   Sando Mur (Mathematician and co-founder);
+-   Marketing team.
+
+# Analized data
+
+The data  was compiled by the FitBit Fitness Tracker Data available on [*Kaggle*](https://www.kaggle.com/datasets/arashnic/fitbit).  
+This dataset has 18 files containing information about the time of physical activity, heart rate, sleep monitoring, etc. The data was gathered for 3 months, with de users previous consent. 
+
+# Data analysis steps
+
+### Loading packages
+
+```{r message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+```
+
+### Data import
+
+```{r}
+
+activities <-read.csv('../fitbase_dataset/dailyActivity_merged.csv')
+View(activities)
+
+calories <- read.csv('../fitbase_dataset/dailyCalories_merged.csv')
+View(calories)
+
+intensities <- read.csv('../fitbase_dataset/dailyIntensities_merged.csv')
+View(intensities)
+
+steps <- read.csv('../fitbase_dataset/dailySteps_merged.csv')
+View(steps)
+
+heart_rate <- read.csv('../fitbase_dataset/heartrate_seconds_merged.csv')
+View(heart_rate)
+
+sleep <- read.csv('../fitbase_dataset/sleepDay_merged.csv')
+View(sleep)
+
+weight <- read.csv('../fitbase_dataset/weightLogInfo_merged.csv')
+View(weight)
+
+```
+
+### Reviewing the data 
+
+Each table atribute was checked for the type of data, number of rows, N/A's, and basic statistical values.  
+We determined that the minimum number of different users for a relevant analysis was 20.  
+The tables *weight* and *heart_rate* were excluded since they had, respectively, only 8 and 14 users.  
+All of the tables have 33 participants except for the *sleep* table, which has 24.
+
+```{r}
+
+summary(weight)
+is.na.data.frame(weight)
+n_distinct(weight$Id)
+
+summary(heart_rate)
+is.na.data.frame(heart_rate)
+n_distinct(heart_rate$Id)
+
+summary(steps)
+is.na.data.frame(steps)
+n_distinct(steps$Id)
+
+summary(intensities)
+is.na.data.frame(intensities)
+n_distinct(intensities$Id)
+
+summary(calories)
+is.na.data.frame(calories)
+n_distinct(calories$Id)
+
+summary(activities)
+is.na.data.frame(activities)
+n_distinct(activities$Id)
+
+summary(sleep)
+is.na.data.frame(sleep)
+n_distinct(sleep$Id)
+
+```
+
+### Joining tables
+
+By joining the *activities* and *sleep* tables using the user ID, a comprehensive table with all attributes was created.  
+Also, a table with the mean values of each attribute from that table was created to simplify the analysis of some of the data. 
+
+```{r}
+
+merge<-merge.data.frame(activities,sleep, by='Id')
+View(merge)
+summary(merge)
+
+activities_mean <- activities %>%
+  select(Id,VeryActiveMinutes,FairlyActiveMinutes,LightlyActiveMinutes,SedentaryMinutes,Calories)%>%
+  group_by(Id)%>%
+  drop_na()%>%
+  summarize(mean_VeryActiveMinutes = mean(VeryActiveMinutes),mean_FairlyActiveMinutes = mean(FairlyActiveMinutes),mean_LightlyActiveMinutes = mean(LightlyActiveMinutes),mean_SedentaryMinutes = mean(SedentaryMinutes), mean_Calories=mean(Calories))
+View(activities_mean)
+
+sleep_mean <- sleep%>%
+  select(Id,TotalMinutesAsleep,TotalTimeInBed)%>%
+  group_by(Id)%>%
+  drop_na()%>%
+  summarize(mean_TotalMinutesAsleep = mean(TotalMinutesAsleep), mean_TotalTimeInBed=mean(TotalTimeInBed))
+View(sleep_mean)
+
+merge_means<-merge.data.frame(activities_mean ,sleep_mean, by='Id')
+View(merge_means)
+
+```
+
+### Visualizations
+
+Let's begin by examining the relationship between the average values of the type and amount of physical activity performed, and the number of calories burned by each user.  
+Most registers indicate that light-intensity activities were performed more frequently and for a longer duration, resulting in an average calorie burn of 1500 to 3500.
+
+```{r}
+
+colors<-c('Intense'="#CC79A7",'Moderate'="#D55E00", 'Light'="#0072B2")
+
+ggplot(data=merge_means, aes(y=mean_Calories))+
+  geom_point(mapping = aes(x=mean_VeryActiveMinutes,color='Intense'),size =2 )+
+  geom_point(mapping = aes(x=mean_FairlyActiveMinutes,color='Moderate'), size =2)+
+  geom_point(mapping = aes(x=mean_LightlyActiveMinutes,color='Light'), size =2)+
+  labs(title = 'Mean burned calories x Activity intensity', 
+       x='Activity intensity (minutes)',
+       y="Mean burned calories")+
+  scale_color_manual(name='Activity intensity:',values=colors)+
+  theme_light()
+
+```
+
+During the three-month data collection period, users had the most entries for sedentary time between 450 to 950 minutes, as shown in the visualization.
+
+```{r}
+
+ggplot(data = merge)+
+  geom_histogram(mapping = aes(SedentaryMinutes), bins=20, binwidth = 100, fill='lightblue')+
+  scale_x_continuous(name='Sedentary time (minutes)',breaks=seq(0,1500,100)) +
+  scale_y_continuous(name=" ")+
+  theme_light()
+
+```
+
+There's a negative correlation between calorie loss and sedentary time, but the visualization shows an initial increase followed by a plateau.  
+Sedentary time is most frequently recorded between 500 to 1000 minutes, while calorie loss typically falls between 1500 to 3500.
+We can infer that the users might not be registering the time they were performing some kind of physical activity for that discrepance.
+
+```{r}
+
+cor.test(merge$SedentaryMinutes, merge$Calories)
+
+ggplot(data=merge, aes(x=SedentaryMinutes,y=Calories))+
+ geom_point() +
+  geom_smooth()+
+  scale_x_continuous(name='Sedentary time (minutes)') +
+  scale_y_continuous(name='Burned calories')+
+  theme_light()+
+  labs(title = 'Sedentary time x Burned calories')
+
+```
+
+The correlation between total number of steps and calories burned is positive.
+
+```{r}
+
+cor.test(merge$TotalSteps, merge$Calories)
+
+ggplot(data=merge)+
+  geom_point(mapping = aes(x=TotalSteps, y=Calories))+
+  labs(title = 'Total steps x Calories', x='Total Steps', y='Calories')+
+  theme_light()
+
+```
+
+After analyzing the data on steps taken, sedentary time, and burned calories, we found that users who were sedentary for more than 700 minutes took up to 15000 steps. However, a smaller amount of these users burned more than 2000 calories.
+
+```{r}
+
+facet_labels <-c('Sedentary time less than 700min', 'Sedentary time greater than 700min')
+names(facet_labels)<-c('FALSE','TRUE')
+
+ggplot(data=merge)+
+  geom_histogram(mapping = aes(TotalSteps, fill=Calories>2000), bins=10)+
+  facet_wrap(~SedentaryMinutes >=700, labeller = as_labeller(facet_labels))+
+  scale_fill_discrete(name='Calories burned:', labels=c("Less than 2000",'Greater than 2000'))+
+  scale_x_continuous(name='Steps') +
+  scale_y_continuous(name="")+
+  theme(legend.position = 'bottom')+
+  theme_light()
+
+```
+
+We discovered that the more time spent lying in bed, the longer users slept, indicating a positive correlation.
+
+```{r}
+
+cor.test(merge$TotalMinutesAsleep,merge$TotalTimeInBed)
+
+ggplot(data=merge)+
+   geom_jitter(mapping = aes(x=TotalMinutesAsleep, y=TotalTimeInBed))+
+   geom_smooth(mapping = aes(x=TotalMinutesAsleep, y=TotalTimeInBed))+
+   scale_x_continuous(name='Time Asleep (minutes)',breaks=seq(0,900,100)) +
+   scale_y_continuous(name="Time in bed (minutes)",breaks=seq(0,1500,100))+
+   theme_light()
+
+```
+
+
+The average time spent sleeping and lying in bed was between 300 to 550 minutes and 350 to 650 minutes, respectively.  
+However, the maximum and average values of these data suggest that the users spent more time lying down than actually sleeping.
+We can infer that the users probably lie in bed doing something before sleep or right after they wake up, like read a book or play with their phones.
+
+```{r}
+
+max(merge$TotalMinutesAsleep)
+mean(merge$TotalMinutesAsleep)
+
+max(merge$TotalTimeInBed)
+mean(merge$TotalTimeInBed)
+
+```
+
+The correlation between sleeping time and sedentary time is negative. However, the visualization depicts a high average sleeping time among people with sedentary time greater than 1000 minutes.
+We can infer that sleep disorders can have implications for the users' practice of physical activity, and it should be properly investigated by a health professional.
+  
+```{r}
+
+cor.test(merge$TotalMinutesAsleep,merge$SedentaryMinutes)
+
+ggplot(data=merge_means)+
+  geom_point(mapping = aes(x=mean_SedentaryMinutes,y=mean_TotalMinutesAsleep,)) +
+  geom_smooth(mapping = aes(x=mean_SedentaryMinutes,y=mean_TotalMinutesAsleep))+
+  theme_light()+
+  labs(title = 'Sedentary time x Sleeping time',
+       x='Sedentary (minutes)',y='Sleep (minutes)')
+
+```
+
+# Recommendations
+
+Bellabeat offers multiple wellness trackers for women, and could invest promoting both the app and **Leaf** , their versatile wellness tracker that monitors sleep, activities, and stress levels.  
+We selected the **Leaf** device primarily because of its elegant appearance, resembling a piece of jewelry. However, it is also crafted from natural and hypoallergenic materials, ensuring a comfortable experience for the user. The device has multiple functions and can be worn as a bracelet, clip, or necklace, making it ideal for use as a sleep monitor. Despite its easy syncing capabilities with smartphones, the device stores its data independently.  
+The marketing campaign should target women who work seated for long periods of time.    
+The analysis showed that users typically engage in light-intensity physical activity for longer durations, ranging from 50 to 300 minutes. According to the [*Physical Activity Guidelines for Americans*](https://health.gov/sites/default/files/2019-09/Physical_Activity_Guidelines_2nd_edition.pdf), the total amount of aerobic physical activity, such as walking, swimming, or cycling, is more important for a healthy lifestyle than its intensity, duration, or frequency.    
+When the user first sign up, she'll be able to personalized her exercise goals. Taking the users age, physical condition, and available time for exercise into consideration, an intuitive form should help the user create the best exercise plan for her routine. Recommendations about the best kind of activity and its intensity, duration, and frequency should be shown to help guide her through her choices.   
+The app can keep users engaged with their exercise plan by sending notifications for exercise time, providing tips for a better session, and suggesting progressions.    
+According to [*Healthline*](https://www.healthline.com/health/how-many-steps-a-day#why-10-000-steps), Several studies have determined that 10,000 daily steps is the ideal minimum. It can vary according to the individuals' age and goals, but its health benefits are many, such as better cholesterol levels, physical conditon, and flexibility.  
+The product can vibrate and/or send an app notification to alert the users their been still for a long time, which can keep them moving throughout the day and reduce sedentary time. The app can also suggest brief activities that can be done within the workplace, such as stretching, walking around the hallway, using the stairs, walking to colleagues' desk instead of emailing or calling, and parking at a distance from the office.  
+The analysis showed that people with high sedentary time still lost a lot of calories, which leads us to believe that the users were not registering the physical activities performed.  
+When a sudden increase in the heart rate and/or number of steps is registered by **Leaf**, it can notify the user so they can identify these alterations as physical activity.  
+The app can recommend actions to improve sleep quality and quantity, such as reducing exposure to blue light, have an adequate sleep enviroment, and better hygine habits. Also, it can educate the users on common sleep disorders so they can better identify irregularities and seek a medical professional.  
+Finally, since Bellabeat has paid subscriptions, we recommend that a trial period be established so that the users can experience its advantages and services. Offering a free plan for the wellness tracker's basic features and sending notifications about the paid personalized services could encourage users to become subscribers.
+
+# Acknowledgement
+
+I would like to thenk everyone who took interest in this project. It's my first data analyse and also the first with R.  
+Any feedback it's appreciated.  
